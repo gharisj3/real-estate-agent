@@ -1,0 +1,123 @@
+:root {
+  --accent: #1f6f50;
+  --bg: #f7f7f5;
+  --card: #ffffff;
+  --text: #222;
+  --border: #ddd;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  background: var(--accent);
+  color: white;
+  padding: 1.5rem 2rem;
+}
+
+header h1 { margin: 0 0 0.25rem; }
+header p { margin: 0; opacity: 0.9; }
+
+main {
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+#property-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+#property-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+  gap: 0.25rem;
+}
+
+.full-width { grid-column: 1 / -1; }
+
+input, select, textarea {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.75rem;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 4px;
+  background: var(--accent);
+  color: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+button#cancel-edit {
+  background: #999;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.6rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+td.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.status-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: white;
+}
+
+.status-available { background: #2e7d32; }
+.status-booked { background: #ef6c00; }
+.status-off-market { background: #777; }
+
+.small-btn {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.delete-btn { background: #b3261e; }
+
+#logout-btn {
+  margin-top: 0.75rem;
+  background: rgba(255, 255, 255, 0.2);
+}

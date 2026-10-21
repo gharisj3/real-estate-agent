@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PropDesk Staff Console</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>PropDesk Staff Console</h1>
+    <p>Manage the property list customers see in the chat.</p>
+    <button type="button" id="logout-btn">Log out</button>
+  </header>
+
+  <main>
+    <section id="form-section">
+      <h2 id="form-title">Add a property</h2>
+      <form id="property-form">
+        <input type="hidden" id="property-id" />
+
+        <label>Title
+          <input type="text" id="title" required />
+        </label>
+
+        <label>Address
+          <input type="text" id="address" required />
+        </label>
+
+        <label>Type
+          <select id="property_type">
+            <option value="apartment">Apartment</option>
+            <option value="villa">Villa</option>
+            <option value="townhouse">Townhouse</option>
+            <option value="office">Office</option>
+          </select>
+        </label>
+
+        <label>Price (AED)
+          <input type="number" id="price" min="0" step="1000" required />
+        </label>
+
+        <label>Bedrooms
+          <input type="number" id="bedrooms" min="0" value="0" />
+        </label>
+
+        <label>Bathrooms
+          <input type="number" id="bathrooms" min="0" value="0" />
+        </label>
+
+        <label>Status
+          <select id="status">
+            <option value="available">Available</option>
+            <option value="booked">Booked</option>
+            <option value="off-market">Off-market</option>
+          </select>
+        </label>
+
+        <label class="full-width">Description
+          <textarea id="description" rows="3"></textarea>
+        </label>
+
+        <div class="form-actions">
+          <button type="submit" id="submit-btn">Add property</button>
+          <button type="button" id="cancel-edit" hidden>Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="list-section">
+      <h2>Properties</h2>
+      <table id="properties-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Address</th>
+            <th>Type</th>
+            <th>Price</th>
+            <th>Beds</th>
+            <th>Baths</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="properties-body">
+          <tr><td colspan="8">Loading...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="bookings-section">
+      <h2>Viewing bookings</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Property</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="bookings-body">
+          <tr><td colspan="7">Loading...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

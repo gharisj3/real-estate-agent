@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PropDesk Chat</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .chat-wrap { max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    #messages { height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+    .msg { max-width: 85%; padding: 0.6rem 0.9rem; border-radius: 12px; white-space: pre-wrap; line-height: 1.4; }
+    .msg.bot { background: #e8f1ec; align-self: flex-start; }
+    .msg.user { background: var(--accent); color: white; align-self: flex-end; }
+    #chat-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    #chat-input { flex: 1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PropDesk</h1>
+    <p>Ask about our properties.</p>
+  </header>
+  <div class="chat-wrap">
+    <div id="messages"></div>
+    <form id="chat-form">
+      <input type="text" id="chat-input" placeholder="e.g. 2 bedroom apartment in Jumeirah under 2m" autocomplete="off" maxlength="500" />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+  <script src="chat.js"></script>
+</body>
+</html>

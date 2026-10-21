@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PropDesk Staff Login</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .login-box { max-width: 360px; margin: 3rem auto; }
+    .login-box form { display: flex; flex-direction: column; gap: 1rem; }
+    .login-box label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+    #error { color: #b3261e; min-height: 1.2em; margin: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PropDesk Staff Login</h1>
+  </header>
+  <section class="login-box">
+    <form id="login-form">
+      <label>Username
+        <input type="text" id="username" autocomplete="username" required />
+      </label>
+      <label>Password
+        <input type="password" id="password" autocomplete="current-password" required />
+      </label>
+      <p id="error" role="alert"></p>
+      <button type="submit">Log in</button>
+    </form>
+  </section>
+  <script>
+    document.getElementById("login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const error = document.getElementById("error");
+      error.textContent = "";
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: document.getElementById("username").value,
+          password: document.getElementById("password").value,
+        }),
+      });
+      if (res.ok) {
+        location.href = "/";
+      } else {
+        const data = await res.json().catch(() => ({}));
+        error.textContent = data.detail || "Login failed.";
+      }
+    });
+  </script>
+</body>
+</html>
