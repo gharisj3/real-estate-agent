@@ -32,8 +32,9 @@ like this one cannot catch.
 PROTECTED_TRAIT_TERMS = {
     "religion": {
         "english": [
-            "muslim", "christian", "hindu", "sikh", "jewish", "catholic",
-            "religion", "religious",
+            "muslim", "muslims", "christian", "christians", "hindu", "hindus",
+            "sikh", "sikhs", "jewish", "jews", "catholic", "catholics",
+            "religion", "religions", "religious",
         ],
         "urdu_script": [
             "مسلمان", "عیسائی", "ہندو", "سکھ", "یہودی", "مذہب",
@@ -45,9 +46,11 @@ PROTECTED_TRAIT_TERMS = {
     },
     "race_or_ethnicity": {
         "english": [
-            "race", "ethnicity", "ethnic", "punjabi", "pathan", "pashtun",
-            "sindhi", "baloch", "muhajir", "south asian", "white people",
-            "black people", "arab",
+            "race", "races", "ethnicity", "ethnicities", "ethnic",
+            "punjabi", "punjabis", "pathan", "pathans", "pashtun",
+            "pashtuns", "sindhi", "sindhis", "baloch", "balochis",
+            "muhajir", "muhajirs", "south asian", "south asians",
+            "white people", "black people", "arab", "arabs",
         ],
         "urdu_script": [
             "نسل", "پنجابی", "پٹھان", "سندھی", "بلوچ", "مہاجر",
@@ -59,8 +62,10 @@ PROTECTED_TRAIT_TERMS = {
     },
     "nationality": {
         "english": [
-            "nationality", "pakistani", "indian", "filipino", "bangladeshi",
-            "emirati", "foreigner", "foreigners", "expat", "expats",
+            "nationality", "nationalities", "pakistani", "pakistanis",
+            "indian", "indians", "filipino", "filipinos", "bangladeshi",
+            "bangladeshis", "emirati", "emiratis", "foreigner",
+            "foreigners", "expat", "expats",
         ],
         "urdu_script": [
             "قومیت", "پاکستانی", "بھارتی", "غیر ملکی",
@@ -95,8 +100,8 @@ PROTECTED_TRAIT_TERMS = {
     },
     "disability": {
         "english": [
-            "disabled", "disability", "handicapped", "wheelchair users",
-            "special needs",
+            "disabled", "disability", "disabilities", "handicapped",
+            "wheelchair users", "special needs",
         ],
         "urdu_script": [
             "معذور", "معذوری",
@@ -188,3 +193,9 @@ STEERING_TERMS = {
 # above. See the explanation in the chat/step log for what that means it
 # will miss, and keep these lists updated as new wording comes up in real
 # conversations.
+#
+# Plural forms (like "Christians" as well as "Christian") were added by
+# hand to the English lists on 2026-11-15, after a real test message used
+# the plural and slipped through. Urdu plurals are often irregular and
+# were not added here — that still needs a native speaker to review and
+# add the right forms.

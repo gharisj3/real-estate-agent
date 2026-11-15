@@ -38,21 +38,24 @@ def load_env_into_os_environ():
         os.environ.setdefault(name, value)
 
 
-def main():
-    load_env_into_os_environ()
+load_env_into_os_environ()
 
+# Django has to be set up before core.pipeline can be imported, since the
+# pipeline looks properties up in the database — set up at the top, the
+# normal way any standalone script reaches a Django app (the same two
+# lines manage.py itself uses).
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "propdesk.settings")
+import django  # noqa: E402
+
+django.setup()
+
+from core.pipeline import handle_message  # noqa: E402
+
+
+def main():
     if not os.environ.get("GROQ_API_KEY"):
         print("Error: no Groq key found. Add GROQ_API_KEY to your .env file.")
         sys.exit(1)
-
-    # Django has to be set up before core.pipeline can be imported, since
-    # the pipeline looks properties up in the database.
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "propdesk.settings")
-    import django
-
-    django.setup()
-
-    from core.pipeline import handle_message
 
     # One run of this script is one conversation, so one session id for
     # its whole lifetime is enough — this is what makes the AI
@@ -62,6 +65,7 @@ def main():
     print("Chatting with Groq, through PropDesk's guards. Type 'exit' to stop.\n")
 
     while True:
+        # 1. Read the customer's line.
         user_text = input("You: ").strip()
         if not user_text:
             continue
@@ -69,7 +73,11 @@ def main():
             print("Bye!")
             break
 
+        # 2. Call the pipeline — this is the only thing that ever talks
+        # to Groq, and only after every guard before it has passed.
         reply, steps_run = handle_message(session_id, user_text)
+
+        # 3. Print the reply.
         print(f"Groq: {reply}\n")
 
 

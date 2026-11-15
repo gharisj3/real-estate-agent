@@ -1,4 +1,10 @@
-"""Send one test message to Groq and print the reply."""
+"""Send one test message to Groq and print the reply.
+
+Class 1 test script only. It skips every guard in core/guards.py and
+core/pipeline.py (no disclosure, no fair-housing check, no override
+check, no facts-only check, no rate limit, no kill switch). It must
+NEVER be used to talk to a real customer — use chat_groq.py for that.
+"""
 import pathlib
 import sys
 
