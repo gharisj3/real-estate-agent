@@ -150,6 +150,32 @@ class HandleMessageTests(TestCase):
         self.assertIn("Our assistant is offline right now", reply)
         self.assertEqual(steps, ["kill_switch", "disclosure"])
 
+    def test_default_prompt_version_is_v1(self):
+        captured_messages = []
+
+        def fake_ai(messages):
+            captured_messages.append(messages)
+            return "We have a 2-bedroom flat in Test Gardens for 5,000,000 PKR."
+
+        handle_message("session-prompt-default", "Any 2 bedroom flats in Lahore?", ai_call=fake_ai)
+
+        system_prompt = captured_messages[0][0]["content"]
+        self.assertIn("v1 instructions", system_prompt)
+
+    @mock.patch.dict(os.environ, {"ASSISTANT_PROMPT_VERSION": "v2"})
+    def test_assistant_prompt_version_setting_switches_the_file(self):
+        captured_messages = []
+
+        def fake_ai(messages):
+            captured_messages.append(messages)
+            return "We have a 2-bedroom flat in Test Gardens for 5,000,000 PKR."
+
+        handle_message("session-prompt-v2", "Any 2 bedroom flats in Lahore?", ai_call=fake_ai)
+
+        system_prompt = captured_messages[0][0]["content"]
+        self.assertIn("v2 instructions", system_prompt)
+        self.assertIn("MATCHES", system_prompt)
+
     def test_disclosure_only_appears_once_per_session(self):
         def fake_ai(messages):
             return "We have a 2-bedroom flat in Test Gardens for 5,000,000 PKR."

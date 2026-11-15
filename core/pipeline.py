@@ -48,7 +48,12 @@ from core.property_search import find_matching_properties, properties_as_facts
 
 logger = logging.getLogger("propdesk.pipeline")
 
-PROMPT_FILE = pathlib.Path(__file__).resolve().parent.parent / "prompts" / "assistant_v1.md"
+PROMPT_DIR = pathlib.Path(__file__).resolve().parent.parent / "prompts"
+
+# Which instructions file to use — prompts/assistant_<version>.md. Set
+# ASSISTANT_PROMPT_VERSION in .env to switch (e.g. to "v2"), with no code
+# change. Leave it out of .env to keep using v1.
+DEFAULT_PROMPT_VERSION = "v1"
 
 # No Llama chat model is on Groq's list right now (checked live on 2026-10-25).
 MODEL = "openai/gpt-oss-20b"
@@ -97,10 +102,18 @@ def _extract_search_filters(text):
     return city, bedrooms, max_price
 
 
+def _prompt_file_for_version(version):
+    return PROMPT_DIR / f"assistant_{version}.md"
+
+
 def _load_system_prompt():
-    """Read the instructions file and swap in the real canary value from
-    .env. Returns (system_prompt, canary)."""
-    template = PROMPT_FILE.read_text(encoding="utf-8")
+    """Read the instructions file for the version named in
+    ASSISTANT_PROMPT_VERSION (or v1, if that setting is left out), and
+    swap in the real canary value from .env. Returns (system_prompt,
+    canary)."""
+    version = os.environ.get("ASSISTANT_PROMPT_VERSION", "").strip() or DEFAULT_PROMPT_VERSION
+    prompt_file = _prompt_file_for_version(version)
+    template = prompt_file.read_text(encoding="utf-8")
     canary = os.environ.get("GUARD_CANARY_TOKEN", "")
     return insert_canary(template, canary), canary
 

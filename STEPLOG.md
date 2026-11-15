@@ -1,5 +1,42 @@
 # PropDesk step log
 
+## 2026-11-15: A second assistant prompt (v2), and a setting to switch between them
+**What changed:**
+- Added `prompts/assistant_v2.md`, a rewritten set of instructions using
+  five prompt-writing techniques: a clear role, step-by-step rules
+  (listing rules, conversation rules), two worked examples (few-shot —
+  one with matches, one with none), a fixed reply format (`title | area |
+  bedrooms | price`, then one question), and a clear instruction for what
+  to do when unsure (ask one question to widen the search, or hand off to
+  a human for legal/mortgage/tax/bargaining/complaints). Did not touch
+  `prompts/assistant_v1.md`. Shown to Gharis for approval before saving,
+  as asked.
+- Added a setting, `ASSISTANT_PROMPT_VERSION`, to `.env.example` and
+  `.env` (default `v1`, so nothing changes unless it's set). Changed
+  `core/pipeline.py`'s `_load_system_prompt()` to read this setting and
+  load `prompts/assistant_<version>.md` — so switching prompts (or adding
+  a v3 later) never needs a code change, only a `.env` edit.
+- Tests added to `core/tests/test_pipeline.py`: with no setting, the AI
+  gets the v1 prompt; with `ASSISTANT_PROMPT_VERSION=v2`, it gets the v2
+  prompt instead (checked by looking for each version's own heading text
+  in what's actually sent to the AI).
+- Ran the whole `core` test suite: 48 tests, all passed.
+- Tested both versions by hand through `chat_groq.py`, asking the same
+  question ("Any 2 bedroom flats in Lahore?"): with no setting, got v1's
+  usual sentence-style reply; with `ASSISTANT_PROMPT_VERSION=v2` set, got
+  v2's exact `title | area | bedrooms | price` line followed by one
+  question — the format worked first try.
+**Files:** `prompts/assistant_v2.md` (new), `.env.example` and `.env`
+(added `ASSISTANT_PROMPT_VERSION=v1`), `core/pipeline.py` (changed
+`_load_system_prompt` to pick the file by version),
+`core/tests/test_pipeline.py` (2 new tests).
+**How to undo:** Delete `prompts/assistant_v2.md`. In `core/pipeline.py`,
+remove `_prompt_file_for_version` and `DEFAULT_PROMPT_VERSION`, and change
+`_load_system_prompt` back to reading a single `PROMPT_FILE` constant set
+to `prompts/assistant_v1.md`. Remove the `ASSISTANT_PROMPT_VERSION` line
+from `.env.example` and `.env`. In `core/tests/test_pipeline.py`, remove
+the two added tests.
+
 ## 2026-11-15: Confirmed chat_groq.py is guard-only, and found a real gap
 **What changed:**
 - Tidied `chat_groq.py`: it already called `handle_message()` for every
