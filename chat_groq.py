@@ -1,17 +1,20 @@
-"""Chat with Groq in the terminal. Type 'exit' to stop."""
+"""Chat with Groq in the terminal, through PropDesk's guard pipeline.
+
+Every message typed here goes through core.pipeline.handle_message(),
+the same path any other chat channel must use — so this terminal chat
+gets the same AI disclosure, fair-housing guard, instruction-override
+guard, facts-only guard, and prompt-leak guard as a real customer chat
+will. Type 'exit' to stop.
+"""
+import os
 import pathlib
 import sys
-
-from groq import APIConnectionError, AuthenticationError, Groq, RateLimitError
+import uuid
 
 # Make sure special characters (like em dashes) print correctly on Windows.
 sys.stdout.reconfigure(encoding="utf-8")
 
 ENV_FILE = pathlib.Path(__file__).resolve().parent / ".env"
-PROMPT_FILE = pathlib.Path(__file__).resolve().parent / "prompts" / "assistant_v1.md"
-
-# No Llama chat model is on Groq's list right now (checked live on 2026-10-25).
-MODEL = "openai/gpt-oss-20b"
 
 
 def read_env_file(path):
@@ -27,21 +30,36 @@ def read_env_file(path):
     return values
 
 
+def load_env_into_os_environ():
+    """Copy every setting from .env into the real environment — without
+    ever printing a value — so Django's settings and the guard pipeline
+    can read them (GROQ_API_KEY, DJANGO_SECRET_KEY, GUARD_CANARY_TOKEN)."""
+    for name, value in read_env_file(ENV_FILE).items():
+        os.environ.setdefault(name, value)
+
+
 def main():
-    api_key = read_env_file(ENV_FILE).get("GROQ_API_KEY", "")
-    if not api_key:
+    load_env_into_os_environ()
+
+    if not os.environ.get("GROQ_API_KEY"):
         print("Error: no Groq key found. Add GROQ_API_KEY to your .env file.")
         sys.exit(1)
 
-    if not PROMPT_FILE.exists():
-        print(f"Error: instructions file not found at {PROMPT_FILE}.")
-        sys.exit(1)
-    system_prompt = PROMPT_FILE.read_text(encoding="utf-8")
+    # Django has to be set up before core.pipeline can be imported, since
+    # the pipeline looks properties up in the database.
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "propdesk.settings")
+    import django
 
-    client = Groq(api_key=api_key)
-    history = [{"role": "system", "content": system_prompt}]
+    django.setup()
 
-    print("Chatting with Groq. Type 'exit' to stop.\n")
+    from core.pipeline import handle_message
+
+    # One run of this script is one conversation, so one session id for
+    # its whole lifetime is enough — this is what makes the AI
+    # disclosure show up once, on the very first reply.
+    session_id = str(uuid.uuid4())
+
+    print("Chatting with Groq, through PropDesk's guards. Type 'exit' to stop.\n")
 
     while True:
         user_text = input("You: ").strip()
@@ -51,22 +69,7 @@ def main():
             print("Bye!")
             break
 
-        history.append({"role": "user", "content": user_text})
-
-        try:
-            response = client.chat.completions.create(model=MODEL, messages=history)
-        except AuthenticationError:
-            print("Error: Groq rejected the key. Check GROQ_API_KEY in .env is correct.")
-            break
-        except APIConnectionError:
-            print("Error: could not reach Groq. Check your internet connection and try again.")
-            continue
-        except RateLimitError:
-            print("Error: Groq's rate limit was reached. Wait a bit and try again.")
-            continue
-
-        reply = response.choices[0].message.content
-        history.append({"role": "assistant", "content": reply})
+        reply, steps_run = handle_message(session_id, user_text)
         print(f"Groq: {reply}\n")
 
 

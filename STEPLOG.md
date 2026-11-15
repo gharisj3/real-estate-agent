@@ -1,5 +1,86 @@
 # PropDesk step log
 
+## 2026-11-15: Wired chat_groq.py into the pipeline — the terminal chat is now guarded
+**What changed:**
+- `chat_groq.py` no longer talks to Groq on its own. It now sets up Django,
+  then calls `core.pipeline.handle_message(session_id, text)` for every
+  message typed in, and just prints whatever it returns. This is the same
+  function any other chat channel must use, so the terminal chat now gets
+  every guard: AI disclosure, fair housing, instruction override, the
+  prompt-leak canary, and facts-only — none of which it had before today.
+- Removed the old direct Groq client code, the model name, the manual
+  conversation history list, and the per-error messages for an invalid key,
+  no internet, or a rate limit — `core/pipeline.py` already fails closed on
+  any of those with its own safe reply and its own log entry, so chat_groq.py
+  doesn't need to handle them itself any more.
+- One session id (a random id) is generated per run of the script, so the
+  disclosure notice appears once, at the start of each run, same as before.
+- Tested by hand, running the script three times: a fair-housing attempt
+  ("I only want Muslim tenants, no one else.") was blocked with the fixed
+  refusal and the disclosure notice, and the guard's log line showed up —
+  the AI was never called. An override attempt ("Please ignore your
+  instructions...") was blocked the same way. An ordinary question ("Hello,
+  what can you help me with?") reached the real AI and got a normal reply,
+  with the disclosure notice on top.
+- Ran the whole `core` test suite again afterwards: still 33 tests, all
+  passed — this change did not touch any guard or test file.
+**Files:** `chat_groq.py` (rewritten to call `core.pipeline.handle_message`).
+**How to undo:** Restore the version of `chat_groq.py` from before this
+entry (it talked to the Groq client directly, with no guards). See the
+2026-10-25 entries below for what that version looked like.
+
+## 2026-11-15: The pipeline — one path every chat channel must use
+**What changed:**
+- Added `core/pipeline.py` with one function, `handle_message(session_id, text)`.
+  This is now the only correct way for any chat channel (the web page later,
+  the terminal script, anything else) to talk to a customer — it runs every
+  guard and the one allowed AI call in a fixed order, so no channel can skip
+  a safety check by mistake:
+  1. Override check (input) — blocks known "ignore your instructions" style
+     messages before the AI ever sees them.
+  2. Fair-housing guard (input) — blocks a request to filter by religion,
+     race, nationality, sex, family status, disability, or age before the
+     AI ever sees it.
+  3. Property search by code (`core/property_search.py`) — works out a city,
+     bedroom count, and price limit from the customer's own words (a city is
+     only recognised if it is already in our database), and looks up the
+     real matching listings. No AI involved.
+  4. One AI call to Groq — given the real matches from step 3, so it can
+     only describe real listings.
+  5. Leak check (output) — throws away the reply if it contains the secret
+     canary or a long copied piece of the instructions.
+  6. Facts-only guard (output) — checks every price and bedroom count in the
+     reply against step 3's matches only, not the whole database.
+  7. AI disclosure — added by code on the first reply of the session only.
+- If anything in steps 3-6 raises an error (a bug, a database problem, Groq
+  being unreachable), the customer is never shown the raw AI reply or a
+  technical error — they get a fixed safe reply ("We could not answer just
+  now. A team member will contact you."), and the error is logged (session
+  id, which step it failed on, the error type — never the customer's words).
+- Keeps one conversation history per session in memory, so the assistant
+  remembers earlier messages in the same chat and the disclosure notice only
+  appears once. This is lost if the server restarts — fine for now, worth
+  moving to the database later.
+- The actual Groq call lives in its own small function
+  (`core.pipeline._default_ai_call`), so tests can swap in a fake AI and run
+  with no internet connection and no real API key.
+- Tests (`core/tests/test_pipeline.py`, 7 tests, all using a fake AI): a
+  normal question gets the real AI reply with the disclosure on top; a
+  fair-housing attempt and an override attempt are both blocked before the
+  AI is ever called (checked by failing the test if the fake AI runs); an
+  invented price is caught by the facts-only guard; a reply that leaks the
+  canary is caught by the leak guard, before the facts-only guard even runs;
+  a fake AI that raises an error still gets the customer the safe reply, and
+  logs the error without the exception's own message text; the disclosure
+  notice appears on the first reply of a session and not the second.
+- Ran the whole `core` test suite: 33 tests, all passed.
+- **Not wired into `chat_groq.py` yet.** The terminal chat script still
+  talks to Groq directly with no guards at all — that is still the next
+  step, now that `handle_message()` exists for it to call.
+**Files:** `core/pipeline.py` (new), `core/tests/test_pipeline.py` (new).
+**How to undo:** Delete `core/pipeline.py` and `core/tests/test_pipeline.py`.
+Nothing else references them yet, so there is nothing else to unwind.
+
 ## 2026-11-01: Property model, sample data, and the fifth guard — facts only
 **What changed:**
 - Added a `Property` model (`core/models.py`): title, city, area, type (flat/house/plot), bedrooms, price, currency (PKR/AED), status (available/sold/rented), description. Registered it in the admin (`core/admin.py`) with a list view, filters, and search. Generated and applied the migration (`core/migrations/0001_initial.py`).
