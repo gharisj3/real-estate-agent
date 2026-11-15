@@ -9,15 +9,17 @@ channel can accidentally skip a safety check.
 The order below is fixed by the rulebook (CLAUDE.md: "safety is
 enforced in code, not in prompts") and must not be changed:
 
-1. Override check (input) — core.guards.check_instruction_override
-2. Fair-housing guard (input) — core.guards.check_fair_housing
-3. Property search by code, no AI — core.property_search
-4. One AI call to Groq, given only the matching properties
-5. Leak check (output) — core.guards.check_output_leak
-6. Facts-only guard (output), checked against step 3's matches only
-7. AI disclosure, added by code on the first reply of the session
+1. Kill switch (input) — core.guards.check_kill_switch
+2. Rate limit per session (input) — core.guards.check_rate_limit
+3. Override check (input) — core.guards.check_instruction_override
+4. Fair-housing guard (input) — core.guards.check_fair_housing
+5. Property search by code, no AI — core.property_search
+6. One AI call to Groq, given only the matching properties
+7. Leak check (output) — core.guards.check_output_leak
+8. Facts-only guard (output), checked against step 5's matches only
+9. AI disclosure, added by code on the first reply of the session
 
-If anything in steps 3-6 raises an error (the database, Groq, or a
+If anything in steps 5-8 raises an error (the database, Groq, or a
 bug), the customer is never shown the raw AI reply or an error
 message — they get a fixed, safe reply instead, and the error is
 logged.
@@ -36,7 +38,9 @@ from core.guards import (
     check_facts_only,
     check_fair_housing,
     check_instruction_override,
+    check_kill_switch,
     check_output_leak,
+    check_rate_limit,
     insert_canary,
 )
 from core.models import Property
@@ -158,28 +162,42 @@ def handle_message(session_id, text, ai_call=_default_ai_call):
 
 
 def _run_pipeline(session_id, text, ai_call, history, steps_run):
-    """Run steps 1-6 and return the reply that step 7 (disclosure) will
+    """Run steps 1-8 and return the reply that step 9 (disclosure) will
     wrap. Any exception here is caught by handle_message, not here."""
 
-    # 1. Override check (input) — no AI call if this triggers.
+    # 1. Kill switch — must be the very first thing checked. No AI call
+    # if the assistant has been switched off in .env.
+    steps_run.append("kill_switch")
+    blocked, reply = check_kill_switch(session_id=session_id)
+    if blocked:
+        return reply
+
+    # 2. Rate limit per session — no AI call if this session is over
+    # the limit.
+    steps_run.append("rate_limit")
+    blocked, reply = check_rate_limit(session_id=session_id)
+    if blocked:
+        return reply
+
+    # 3. Override check (input) — no AI call if this triggers.
     steps_run.append("override_check")
     blocked, reply = check_instruction_override(text, session_id=session_id)
     if blocked:
         return reply
 
-    # 2. Fair-housing guard (input) — no AI call if this triggers.
+    # 4. Fair-housing guard (input) — no AI call if this triggers.
     steps_run.append("fair_housing")
     blocked, reply = check_fair_housing(text, session_id=session_id)
     if blocked:
         return reply
 
-    # 3. Property search by code — no AI involved in deciding matches.
+    # 5. Property search by code — no AI involved in deciding matches.
     steps_run.append("property_search")
     city, bedrooms, max_price = _extract_search_filters(text)
     matches = find_matching_properties(city=city, bedrooms=bedrooms, max_price=max_price)
     facts = properties_as_facts(matches)
 
-    # 4. One AI call, given only the matching properties from step 3.
+    # 6. One AI call, given only the matching properties from step 5.
     steps_run.append("ai_call")
     system_prompt, canary = _load_system_prompt()
     messages = (
@@ -192,13 +210,13 @@ def _run_pipeline(session_id, text, ai_call, history, steps_run):
     )
     ai_reply = ai_call(messages)
 
-    # 5. Leak check (output).
+    # 7. Leak check (output).
     steps_run.append("leak_check")
     blocked, safe_reply = check_output_leak(ai_reply, system_prompt, canary, session_id=session_id)
     if blocked:
         return safe_reply
 
-    # 6. Facts-only guard (output) — checked against step 3's matches
+    # 8. Facts-only guard (output) — checked against step 5's matches
     # only, never the whole database.
     steps_run.append("facts_only")
     blocked, safe_reply = check_facts_only(ai_reply, matches, session_id=session_id)

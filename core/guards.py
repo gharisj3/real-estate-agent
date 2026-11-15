@@ -9,8 +9,12 @@ This file has no AI calls in it at all.
 """
 
 import logging
+import os
 import re
+import time
 from datetime import datetime, timezone
+
+from django.core.cache import cache
 
 from core.guard_terms import (
     OVERRIDE_ATTEMPT_PHRASES,
@@ -345,6 +349,106 @@ def _log_facts_only_mismatch(session_id, bad_price_count, bad_bedroom_count):
         "guard_triggered rule=facts_only bad_prices=%s bad_bedrooms=%s session=%s time=%s",
         bad_price_count,
         bad_bedroom_count,
+        session_id,
+        datetime.now(timezone.utc).isoformat(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Guard: kill switch — a manual off switch for the whole assistant
+# ---------------------------------------------------------------------------
+
+# Edit this text to change what customers see while the assistant is off.
+BOT_OFFLINE_REPLY = "Our assistant is offline right now. A team member will reply soon."
+
+
+def check_kill_switch(session_id="unknown"):
+    """Check the PROPDESK_BOT_ENABLED setting in .env, before anything
+    else runs for this message.
+
+    Set PROPDESK_BOT_ENABLED=false in .env (no restart needed if the
+    channel re-reads it, otherwise restart it) to take the assistant
+    offline for every customer at once — no code change, no AI call.
+    A missing setting, or anything other than exactly "false", counts
+    as on, so a typo in .env cannot accidentally take the assistant
+    down.
+
+    Returns (blocked, reply) — same shape as the other guards.
+    """
+    raw_value = os.environ.get("PROPDESK_BOT_ENABLED", "true")
+    enabled = raw_value.strip().lower() != "false"
+    if enabled:
+        return False, None
+    _log_kill_switch_triggered(session_id)
+    return True, BOT_OFFLINE_REPLY
+
+
+def _log_kill_switch_triggered(session_id):
+    """Record that the guard fired — only the time and the session id."""
+    logger.warning(
+        "guard_triggered rule=kill_switch session=%s time=%s",
+        session_id,
+        datetime.now(timezone.utc).isoformat(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Guard: rate limit — at most a fixed number of messages per session, per
+# time window
+# ---------------------------------------------------------------------------
+
+# Edit these two numbers to change the limit — they are the only two
+# settings this guard has, and they both live here, in one place.
+RATE_LIMIT_MAX_MESSAGES = 20
+RATE_LIMIT_WINDOW_SECONDS = 600  # 10 minutes
+
+# Edit this text to change what a rate-limited customer sees.
+RATE_LIMIT_REPLY = "You are sending messages quickly. Please wait a few minutes."
+
+
+def _rate_limit_cache_key(session_id):
+    return f"propdesk:rate_limit:{session_id}"
+
+
+def check_rate_limit(session_id="unknown", now=None):
+    """Check whether this session has already sent RATE_LIMIT_MAX_MESSAGES
+    messages in the last RATE_LIMIT_WINDOW_SECONDS seconds.
+
+    Uses Django's own cache (no new library to install) to remember,
+    for each session, the times its recent messages arrived. `now` is
+    only for tests, so they do not have to wait 10 real minutes — leave
+    it out in real use and the real clock is used.
+
+    This message is counted whether it ends up blocked or not, so a
+    visitor cannot get extra tries by sending messages while blocked —
+    the limit only clears once the session stops sending messages for
+    a whole window.
+
+    Returns (blocked, reply) — same shape as the other guards.
+    """
+    current_time = time.time() if now is None else now
+    key = _rate_limit_cache_key(session_id)
+    timestamps = cache.get(key) or []
+
+    window_start = current_time - RATE_LIMIT_WINDOW_SECONDS
+    recent = [sent_at for sent_at in timestamps if sent_at > window_start]
+
+    blocked = len(recent) >= RATE_LIMIT_MAX_MESSAGES
+
+    recent.append(current_time)
+    cache.set(key, recent, timeout=RATE_LIMIT_WINDOW_SECONDS)
+
+    if blocked:
+        _log_rate_limit_triggered(session_id)
+        return True, RATE_LIMIT_REPLY
+
+    return False, None
+
+
+def _log_rate_limit_triggered(session_id):
+    """Record that the guard fired — only the time and the session id."""
+    logger.warning(
+        "guard_triggered rule=rate_limit session=%s time=%s",
         session_id,
         datetime.now(timezone.utc).isoformat(),
     )

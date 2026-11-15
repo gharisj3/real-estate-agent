@@ -22,7 +22,7 @@ from core.pipeline import SAFE_REPLY_ON_ERROR, handle_message
 TEST_CANARY = "TEST-CANARY-abc123"
 
 
-@mock.patch.dict(os.environ, {"GUARD_CANARY_TOKEN": TEST_CANARY})
+@mock.patch.dict(os.environ, {"GUARD_CANARY_TOKEN": TEST_CANARY, "PROPDESK_BOT_ENABLED": "true"})
 class HandleMessageTests(TestCase):
     def setUp(self):
         self.flat = Property.objects.create(
@@ -55,6 +55,8 @@ class HandleMessageTests(TestCase):
         self.assertEqual(
             steps,
             [
+                "kill_switch",
+                "rate_limit",
                 "override_check",
                 "fair_housing",
                 "property_search",
@@ -75,7 +77,9 @@ class HandleMessageTests(TestCase):
 
         self.assertIn(FAIR_HOUSING_REFUSAL, reply)
         self.assertNotIn("ai_call", steps)
-        self.assertEqual(steps, ["override_check", "fair_housing", "disclosure"])
+        self.assertEqual(
+            steps, ["kill_switch", "rate_limit", "override_check", "fair_housing", "disclosure"]
+        )
 
     def test_override_attempt_is_blocked_before_the_ai(self):
         def fake_ai(messages):
@@ -89,7 +93,7 @@ class HandleMessageTests(TestCase):
 
         self.assertIn(INSTRUCTION_OVERRIDE_REFUSAL, reply)
         self.assertNotIn("ai_call", steps)
-        self.assertEqual(steps, ["override_check", "disclosure"])
+        self.assertEqual(steps, ["kill_switch", "rate_limit", "override_check", "disclosure"])
 
     def test_invented_price_is_caught_by_facts_only(self):
         # The real price is 5,000,000 — the fake AI invents a different one.
@@ -133,6 +137,18 @@ class HandleMessageTests(TestCase):
         self.assertIn("session-crash", log_line)
         self.assertIn("RuntimeError", log_line)
         self.assertNotIn("Groq is unreachable right now", log_line)
+
+    @mock.patch.dict(os.environ, {"PROPDESK_BOT_ENABLED": "false"})
+    def test_bot_offline_blocks_everything_before_the_ai(self):
+        def fake_ai(messages):
+            self.fail("the AI must not be called while the kill switch is off")
+
+        reply, steps = handle_message(
+            "session-offline", "Any 2 bedroom flats in Lahore?", ai_call=fake_ai
+        )
+
+        self.assertIn("Our assistant is offline right now", reply)
+        self.assertEqual(steps, ["kill_switch", "disclosure"])
 
     def test_disclosure_only_appears_once_per_session(self):
         def fake_ai(messages):

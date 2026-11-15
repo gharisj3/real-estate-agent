@@ -1,5 +1,61 @@
 # PropDesk step log
 
+## 2026-11-15: Two more guards — a kill switch and a rate limit per session
+**What changed:**
+- Added `check_kill_switch` to `core/guards.py`. It reads a new setting,
+  `PROPDESK_BOT_ENABLED`, from `.env`. Set it to `false` and every customer
+  gets "Our assistant is offline right now. A team member will reply soon."
+  instead of a real reply — no AI call at all, for anyone. Anything other
+  than exactly `false` (including a missing setting) counts as on, so a
+  typo in `.env` can't accidentally take the assistant down. Added
+  `PROPDESK_BOT_ENABLED=true` to `.env.example` and to the real `.env`.
+- Added `check_rate_limit` to `core/guards.py`. It remembers, per chat
+  session, the times its last messages arrived, using Django's own cache
+  (no new library to install). The two numbers — 20 messages, 10 minutes —
+  are both constants (`RATE_LIMIT_MAX_MESSAGES`, `RATE_LIMIT_WINDOW_SECONDS`)
+  right next to each other at the top of that guard's section, so they're
+  easy to find and change together. Past the limit, a session gets "You are
+  sending messages quickly. Please wait a few minutes." instead of reaching
+  the AI, until the 10-minute window has cleared.
+- Wired both into `core/pipeline.py`, as the very first two checks —
+  before the override check, before the fair-housing guard, before
+  anything else. The kill switch runs first; if the assistant is off, the
+  rate limit is never even checked for that message.
+- Tests: `core/tests/test_kill_switch_guard.py` (6 tests) — on/off, case
+  does not matter, a missing or unrecognised value defaults to on, and the
+  trigger is logged. `core/tests/test_rate_limit_guard.py` (6 tests) — the
+  20th message in a session is allowed, the 21st is blocked, the limit
+  resets once the window has passed (using a fake `now` passed straight
+  into the guard — no 10-minute sleep), a different session has its own,
+  separate limit, and the trigger is logged. Also added one test to
+  `core/tests/test_pipeline.py` proving the kill switch is wired correctly:
+  with it off, `handle_message` returns the offline reply and the AI is
+  never called.
+- Updated `docs/guards.md`: the rate-limit row is now marked "(built)",
+  with its real numbers (20 messages / 10 minutes) instead of a vague
+  description, and a new "(built)" row was added for the kill switch.
+- Ran the whole `core` test suite: 46 tests, all passed.
+**Files:** `core/guards.py` (added `check_kill_switch`, `check_rate_limit`,
+and their constants/logging helpers; added `os`, `time`, and
+`django.core.cache` imports), `core/pipeline.py` (wired both checks in as
+steps 1 and 2, renumbered the rest), `.env.example` and `.env` (added
+`PROPDESK_BOT_ENABLED=true`), `core/tests/test_kill_switch_guard.py` (new),
+`core/tests/test_rate_limit_guard.py` (new), `core/tests/test_pipeline.py`
+(updated expected step lists, added the kill-switch wiring test),
+`docs/guards.md` (updated two rows).
+**How to undo:** Delete `core/tests/test_kill_switch_guard.py` and
+`core/tests/test_rate_limit_guard.py`. In `core/tests/test_pipeline.py`,
+remove the `test_bot_offline_blocks_everything_before_the_ai` test, remove
+`"PROPDESK_BOT_ENABLED": "true"` from the class decorator, and remove
+`"kill_switch", "rate_limit",` from the three expected step lists it was
+added to. In `core/pipeline.py`, remove steps 1 and 2 (kill switch, rate
+limit) from `_run_pipeline` and from the import line, and renumber the
+rest back to 1-7. In `core/guards.py`, remove everything from "Guard: kill
+switch" onward, and remove the now-unused `os`, `time`, and
+`django.core.cache` imports if nothing else in the file needs them.
+Remove the `PROPDESK_BOT_ENABLED` line from `.env.example` and `.env`. In
+`docs/guards.md`, revert the two edited rows.
+
 ## 2026-11-15: Wired chat_groq.py into the pipeline — the terminal chat is now guarded
 **What changed:**
 - `chat_groq.py` no longer talks to Groq on its own. It now sets up Django,
